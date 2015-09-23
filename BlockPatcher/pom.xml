@@ -1,40 +1,35 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.comphenix.blockpatcher</groupId>
   <artifactId>BlockPatcher</artifactId>
-  <version>1.5.0</version>
   <name>BlockPatcher</name>
+  <version>1.6.0-SNAPSHOT</version>
+
   <description>Allow unmodified clients to connect to a server with custom blocks.</description>
-  
+
   <properties>
     <project.build.sourceEncoding>cp1252</project.build.sourceEncoding>
   </properties>
-  
+
   <repositories>
     <repository>
-      <id>bukkit-rep</id>
-      <url>http://repo.bukkit.org/content/groups/public</url>
-    </repository>
-    <repository>
-      <id>comphenix-rep</id>
-      <name>Comphenix Maven Releases</name>
-      <url>http://repo.comphenix.net/content/groups/public</url>
+      <id>dmulloy2-repo</id>
+      <url>http://repo.dmulloy2.net/content/groups/public/</url>
     </repository>
   </repositories>
-  
+
   <distributionManagement>
     <repository>
-      <id>comphenix-releases</id>
-      <name>Comphenix Maven Releases</name>
-      <url>http://repo.comphenix.net/content/repositories/releases/</url>
+      <id>dmulloy2-repo</id>
+      <url>http://repo.dmulloy2.net/content/repositories/releases/</url>
     </repository>
     <snapshotRepository>
-      <id>comphenix-snapshots</id>
-      <name>Comphenix Maven Snapshots</name>
-      <url>http://repo.comphenix.net/content/repositories/snapshots/</url>
+      <id>dmulloy2-repo</id>
+      <url>http://repo.dmulloy2.net/content/repositories/snapshots/</url>
     </snapshotRepository>
   </distributionManagement>
-  
+
   <build>
     <sourceDirectory>src/main/java</sourceDirectory>
     <resources>
@@ -47,57 +42,19 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>2.3.2</version>
         <configuration>
-          <source>1.6</source>
-          <target>1.6</target>
+          <source>1.7</source>
+          <target>1.7</target>
         </configuration>
       </plugin>
     </plugins>
   </build>
-  
-  <profiles>
-  <profile>
-    <id>release-profile</id>
-    <build>
-      <plugins>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-source-plugin</artifactId>
-          <version>2.2</version>
-          <executions>
-            <execution>
-              <id>attach-sources</id>
-              <goals>
-                <goal>jar</goal>
-              </goals>
-            </execution>
-          </executions>
-        </plugin>
-      
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-javadoc-plugin</artifactId>
-          <version>2.9</version>
-          <executions>
-            <execution>
-              <id>attach-javadocs</id>
-              <goals>
-                <goal>jar</goal>
-              </goals>
-            </execution>
-          </executions>
-        </plugin>
-   
-      </plugins>
-    </build>
-  </profile>
-  </profiles>
-  
+
   <scm>
-    <connection>scm:git:git://github.com/aadnk/BlockPatcher.git</connection>
-    <developerConnection>scm:git:git@github.com:aadnk/BlockPatcher.git</developerConnection>
-    <url>https://github.com/aadnk/BlockPatcher</url>
+    <connection>scm:git:git://github.com/dmulloy2/BlockPatcher.git</connection>
+    <developerConnection>scm:git:git@github.com:dmulloy2/BlockPatcher.git</developerConnection>
+    <url>https://github.com/dmulloy2/BlockPatcher</url>
   </scm>
-  
+
   <licenses>
     <license>
       <name>GNU GENERAL PUBLIC LICENSE - Version 2, June 1991</name>
@@ -105,7 +62,7 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
-  
+
   <developers>
     <developer>
       <id>aadnk</id>
@@ -119,19 +76,17 @@
       <timezone>1</timezone>
     </developer>
   </developers>
-  
+
   <dependencies>
-  	<dependency>
-  		<groupId>org.bukkit</groupId>
-  		<artifactId>craftbukkit</artifactId>
-  		<version>1.7.2-R0.3-SNAPSHOT</version>
-  		<scope>provided</scope>
-  	</dependency>
-  	<dependency>
-  		<groupId>com.comphenix.protocol</groupId>
-  		<artifactId>ProtocolLib</artifactId>
-  		<version>3.0.1</version>
-  		<scope>provided</scope>
-  	</dependency>
+    <dependency>
+      <groupId>org.spigotmc</groupId>
+      <artifactId>spigot</artifactId>
+      <version>1.8.8-R0.1-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>com.comphenix.protocol</groupId>
+      <artifactId>ProtocolLib</artifactId>
+      <version>3.6.4</version>
+    </dependency>
   </dependencies>
 </project>

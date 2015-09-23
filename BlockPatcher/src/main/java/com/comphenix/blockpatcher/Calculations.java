@@ -1,23 +1,23 @@
 package com.comphenix.blockpatcher;
 
 /*
- *  BlockPatcher - Safely convert one block ID to another for the client only 
+ *  BlockPatcher - Safely convert one block ID to another for the client only
  *  Copyright (C) 2012 Kristian S. Stangeland
  *
- *  This program is free software; you can redistribute it and/or modify it under the terms of the 
- *  GNU General Public License as published by the Free Software Foundation; either version 2 of 
+ *  This program is free software; you can redistribute it and/or modify it under the terms of the
+ *  GNU General Public License as published by the Free Software Foundation; either version 2 of
  *  the License, or (at your option) any later version.
  *
- *  This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+ *  This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *  See the GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License along with this program; 
- *  if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 
+ *  You should have received a copy of the GNU General Public License along with this program;
+ *  if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  *  02111-1307 USA
  *
  *  Credits:
- *   * Parts of this code was adapted from the Bukkit plugin Orebfuscator by lishid. 
+ *   * Parts of this code was adapted from the Bukkit plugin Orebfuscator by lishid.
  */
 import java.util.concurrent.TimeUnit;
 
@@ -79,11 +79,11 @@ class Calculations {
 	
 	public boolean isImportantChunkBulk(PacketContainer packet, Player player) throws FieldAccessException {
     	StructureModifier<int[]> intArrays = packet.getSpecificModifier(int[].class);
-        int[] x = intArrays.read(0); 
-        int[] z = intArrays.read(1); 
+        int[] x = intArrays.read(0);
+        int[] z = intArrays.read(1);
         
         for (int i = 0; i < x.length; i++) {
-            if (Math.abs(x[i] - (((int) player.getLocation().getX()) >> 4)) == 0 && 
+            if (Math.abs(x[i] - (((int) player.getLocation().getX()) >> 4)) == 0 &&
             	Math.abs(z[i] - (((int) player.getLocation().getZ())) >> 4) == 0) {
                 return true;
             }
@@ -93,10 +93,10 @@ class Calculations {
 	
 	public boolean isImportantChunk(PacketContainer packet, Player player) throws FieldAccessException {
 		StructureModifier<Integer> ints = packet.getSpecificModifier(int.class);
-		int x = ints.read(0); 	
+		int x = ints.read(0);
         int y = ints.read(1);
         
-        if (Math.abs(x - (((int) player.getLocation().getX()) >> 4)) == 0 && 
+        if (Math.abs(x - (((int) player.getLocation().getX()) >> 4)) == 0 &&
         	Math.abs(y - (((int) player.getLocation().getZ())) >> 4) == 0) {
         	return true;
         }
@@ -160,7 +160,7 @@ class Calculations {
         info.hasContinous = getOrDefault(packet.getBooleans().readSafely(0), true);
         info.startIndex = 0;
         
-        if (info.data != null) { 
+        if (info.data != null) {
         	translateChunkInfoAndObfuscate(info, info.data);
         }
     }
@@ -171,7 +171,7 @@ class Calculations {
     	int y = ints.read(1);
     	int z = ints.read(2);
     	int blockID = 0;
-    	int data = 0; 
+    	int data = 0;
     	
     	if (MinecraftReflection.isUsingNetty()) {
     		blockID = packet.getBlocks().read(0).getId();
@@ -185,7 +185,7 @@ class Calculations {
     	ConversionLookup lookup = cache.loadCacheOrDefault(player, x >> 4, y >> 4, z >> 4);
     	
     	// Convert using the tables
-    	int newBlockID = lookup.getBlockLookup(blockID);	
+    	int newBlockID = lookup.getBlockLookup(blockID);
     	int newData = lookup.getDataLookup(blockID, data);
 
     	// Write the changes
@@ -212,10 +212,10 @@ class Calculations {
     	//
     	// Byte index:  |       Zero        |       One       |       Two       |      Three        |
     	// Bit index:   |  0 - 3  |  4 - 7  |    8   -   15   |   16        -       27   |  28 - 31 |
-    	// Content:     |    x    |    z    |        y        |         block id         |   data   | 
-    	//  
+    	// Content:     |    x    |    z    |        y        |         block id         |   data   |
+    	//
     	for (int i = 0; i < data.length; i += 4) {
-    		int block = ((data[i + 2] << 4) & 0xFFF) | 
+    		int block = ((data[i + 2] << 4) & 0xFFF) |
     				    ((data[i + 3] >> 4) & 0xF);
     		int info = data[i + 3] & 0xF;
     		int chunkY = (data[i + 1] & 0xFF) >> 4;
@@ -333,7 +333,7 @@ class Calculations {
         // This optimization was added in 1.4.6. Note that ideally you should get this from the "f" (skylight) field.
         int skylightCount = info.player.getWorld().getEnvironment() == Environment.NORMAL ? 1 : 0;
         
-        // The total size of a chunk is the number of blocks sent (depends on the number of sections) multiplied by the 
+        // The total size of a chunk is the number of blocks sent (depends on the number of sections) multiplied by the
         // amount of bytes per block. This last figure can be calculated by adding together all the data parts:
         //   For any block:
         //    * Block ID          -   8 bits per block (byte)
@@ -345,11 +345,11 @@ class Calculations {
         //    * Add array         -   4 bits per block
         //   Biome array - only if the entire chunk (has continous) is sent:
         //    * Biome array       -   256 bytes
-        // 
-        // A section has 16 * 16 * 16 = 4096 blocks. 
+        //
+        // A section has 16 * 16 * 16 = 4096 blocks.
         info.size = BYTES_PER_NIBBLE_PART * (
-        					(NIBBLES_REQUIRED + skylightCount) * info.chunkSectionNumber + 
-        					info.extraSectionNumber) + 
+        					(NIBBLES_REQUIRED + skylightCount) * info.chunkSectionNumber +
+        					info.extraSectionNumber) +
         			(info.hasContinous ? BIOME_ARRAY_LENGTH : 0);
         
         info.blockSize = 4096 * info.chunkSectionNumber;
@@ -358,7 +358,7 @@ class Calculations {
             return;
         }
 
-        // Make sure the chunk is loaded 
+        // Make sure the chunk is loaded
         if (isChunkLoaded(info.player.getWorld(), info.chunkX, info.chunkZ)) {
         	// Invoke the event
         	SegmentLookup baseLookup = cache.getDefaultLookupTable();
@@ -438,8 +438,8 @@ class Calculations {
         }
         
         //watch.stop();
-        //System.out.println(String.format("Processed x: %s, z: %s in %s ms.", 
-        //			       info.chunkX, info.chunkZ, 
+        //System.out.println(String.format("Processed x: %s, z: %s in %s ms.",
+        //			       info.chunkX, info.chunkZ,
         //			       getMilliseconds(watch))
         //);
         
@@ -483,6 +483,6 @@ class Calculations {
     }
     
 	public static double getMilliseconds(Stopwatch watch) {
-		return watch.elapsedTime(TimeUnit.NANOSECONDS) / 1000000.0;
+		return watch.elapsed(TimeUnit.NANOSECONDS) / 1000000.0;
 	}
 }
