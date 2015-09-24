@@ -1,6 +1,4 @@
-package com.comphenix.blockpatcher;
-
-/*
+/**
  *  BlockPatcher - Safely convert one block ID to another for the client only
  *  Copyright (C) 2012 Kristian S. Stangeland
  *
@@ -19,6 +17,8 @@ package com.comphenix.blockpatcher;
  *  Credits:
  *   * Parts of this code was adapted from the Bukkit plugin Orebfuscator by lishid.
  */
+package com.comphenix.blockpatcher;
+
 import java.util.concurrent.TimeUnit;
 
 import org.bukkit.Material;
@@ -37,6 +37,8 @@ import com.comphenix.protocol.reflect.StructureModifier;
 import com.comphenix.protocol.reflect.accessors.Accessors;
 import com.comphenix.protocol.reflect.accessors.FieldAccessor;
 import com.comphenix.protocol.utility.MinecraftReflection;
+import com.comphenix.protocol.utility.MinecraftVersion;
+import com.comphenix.protocol.wrappers.WrappedBlockData;
 import com.comphenix.protocol.wrappers.WrappedDataWatcher;
 import com.google.common.base.Stopwatch;
 
@@ -61,13 +63,14 @@ class Calculations {
 	    public int size;
 	    public int blockSize;
 	}
-		
+
 	// Useful Minecraft constants
 	private static final int BYTES_PER_NIBBLE_PART = 2048;
 	private static final int CHUNK_SEGMENTS = 16;
 	private static final int NIBBLES_REQUIRED = 4;
 	private static final int BIOME_ARRAY_LENGTH = 256;
-	
+	private static boolean atLeast18 = MinecraftVersion.getCurrentVersion().isAtLeast(MinecraftVersion.BOUNTIFUL_UPDATE);
+
 	// Used to get a chunk's specific lookup table
 	private EventScheduler scheduler;
 	private ConversionCache cache;
@@ -114,8 +117,8 @@ class Calculations {
         
         int dataStartIndex = 0;
         int[] chunkMask = intArrays.read(2); // packet.a;
-        int[] extraMask = intArrays.read(3); // packet.b;
-        
+        int[] extraMask = atLeast18 ? null : intArrays.read(3); // packet.b;
+
         for (int chunkNum = 0; chunkNum < infos.length; chunkNum++) {
             // Create an info objects
             ChunkInfo info = new ChunkInfo();
@@ -124,7 +127,7 @@ class Calculations {
             info.chunkX = x[chunkNum];
             info.chunkZ = z[chunkNum];
             info.chunkMask = chunkMask[chunkNum];
-            info.extraMask = extraMask[chunkNum];
+            info.extraMask = atLeast18 ? extraMask[chunkNum] : -1;
             info.hasContinous = true; // Always true
             info.data = byteArrays.read(1); //packet.buildBuffer;
             
@@ -149,35 +152,54 @@ class Calculations {
     	StructureModifier<Integer> ints = packet.getSpecificModifier(int.class);
     	StructureModifier<byte[]> byteArray = packet.getSpecificModifier(byte[].class);
         
-        // Create an info objects
-        ChunkInfo info = new ChunkInfo();
-        info.player = player;
-        info.chunkX = ints.read(0); 	// packet.a;
-        info.chunkZ = ints.read(1); 	// packet.b;
-        info.chunkMask = ints.read(2); 	// packet.c;
-        info.extraMask = ints.read(3);  // packet.d;
-        info.data = byteArray.read(1);  // packet.inflatedBuffer;
-        info.hasContinous = getOrDefault(packet.getBooleans().readSafely(0), true);
-        info.startIndex = 0;
-        
-        if (info.data != null) {
-        	translateChunkInfoAndObfuscate(info, info.data);
-        }
-    }
+		ChunkInfo info = new ChunkInfo();
+
+		if (atLeast18) {
+			info.player = player;
+			info.chunkX = ints.read(0); // packet.a
+			info.chunkZ = ints.read(1); // packet.b
+
+			Object chunkMap = packet.getModifier().read(2);
+			StructureModifier<Object> modifier = new StructureModifier<Object>(chunkMap.getClass()).withTarget(chunkMap);
+			info.data = (byte[]) modifier.read(0);       // ChunkMap.a
+			info.chunkMask = (Integer) modifier.read(1); // ChunkMap.b
+			info.extraMask = -1;						 // Not in 1.8
+
+			info.hasContinous = packet.getBooleans().readSafely(0); // packet.d
+			info.startIndex = 0;
+		} else {
+			info.player = player;
+			info.chunkX = ints.read(0); 	// packet.a;
+			info.chunkZ = ints.read(1); 	// packet.b;
+			info.chunkMask = ints.read(2); 	// packet.c;
+			info.extraMask = ints.read(3);  // packet.d;
+			info.data = byteArray.read(1);  // packet.inflatedBuffer;
+			info.hasContinous = getOrDefault(packet.getBooleans().readSafely(0), true);
+			info.startIndex = 0;
+		}
+
+		if (info.data != null) {
+			translateChunkInfoAndObfuscate(info, info.data);
+		}
+	}
         
     public void translateBlockChange(PacketContainer packet, Player player) throws FieldAccessException {
     	StructureModifier<Integer> ints = packet.getSpecificModifier(int.class);
     	int x = ints.read(0);
     	int y = ints.read(1);
     	int z = ints.read(2);
-    	int blockID = 0;
+    	Material type = null;
     	int data = 0;
     	
-    	if (MinecraftReflection.isUsingNetty()) {
-    		blockID = packet.getBlocks().read(0).getId();
+    	if (atLeast18) {
+    		WrappedBlockData blockData = packet.getBlockData().read(0);
+    		type = blockData.getType();
+    		data = blockData.getData();
+    	} else if (MinecraftReflection.isUsingNetty()) {
+    		type = packet.getBlocks().read(0);
     		data = ints.read(3);
     	} else {
-    		blockID = ints.read(3);
+    		type = Material.getMaterial(ints.read(3));
     		data = ints.read(4);
     	}
     	
@@ -185,11 +207,13 @@ class Calculations {
     	ConversionLookup lookup = cache.loadCacheOrDefault(player, x >> 4, y >> 4, z >> 4);
     	
     	// Convert using the tables
-    	int newBlockID = lookup.getBlockLookup(blockID);
-    	int newData = lookup.getDataLookup(blockID, data);
+    	int newBlockID = lookup.getBlockLookup(type.getId()); // TODO Use Materials instead
+    	int newData = lookup.getDataLookup(type.getId(), data);
 
     	// Write the changes
-    	if (MinecraftReflection.isUsingNetty()) {
+    	if (atLeast18) {
+    		packet.getBlockData().write(0, WrappedBlockData.createData(Material.getMaterial(newBlockID), newData));
+    	} else if (MinecraftReflection.isUsingNetty()) {
     		packet.getBlocks().write(0, Material.getMaterial(newBlockID));
     		ints.write(3, newData);
     	} else {
@@ -324,7 +348,7 @@ class Calculations {
             if ((info.chunkMask & (1 << i)) > 0) {
                 info.chunkSectionNumber++;
             }
-            if ((info.extraMask & (1 << i)) > 0) {
+            if (info.extraMask != -1 && (info.extraMask & (1 << i)) > 0) {
                 info.extraSectionNumber++;
             }
         }
