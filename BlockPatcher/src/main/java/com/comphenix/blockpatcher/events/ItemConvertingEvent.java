@@ -11,12 +11,12 @@ import org.bukkit.inventory.ItemStack;
  * @author Kristian
  */
 public class ItemConvertingEvent extends Event {
-	
-    private static final HandlerList handlers = new HandlerList();
 
-    private Player player;
-    private ItemStack[] itemStacks;
-    private boolean fromInventory;
+	private static final HandlerList handlers = new HandlerList();
+
+	private Player player;
+	private ItemStack[] itemStacks;
+	private boolean fromInventory;
 
 	public ItemConvertingEvent(ItemStack[] itemStacks, Player player, boolean fromInventory) {
 		super();
@@ -27,6 +27,7 @@ public class ItemConvertingEvent extends Event {
 
 	/**
 	 * The player that will recieve this conversion.
+	 * 
 	 * @return The involved player.
 	 */
 	public Player getPlayer() {
@@ -37,6 +38,7 @@ public class ItemConvertingEvent extends Event {
 	 * The item stacks to be converted.
 	 * <p>
 	 * Note that they're not always derived from CraftItemStack.
+	 * 
 	 * @return Item stacks to convert.
 	 */
 	public ItemStack[] getItemStacks() {
@@ -45,6 +47,7 @@ public class ItemConvertingEvent extends Event {
 
 	/**
 	 * Whether or not this event originated from an inventory.
+	 * 
 	 * @return TRUE if this event was invoked due to an inventory action, FALSE otherwise.
 	 */
 	public boolean isFromInventory() {
@@ -55,12 +58,13 @@ public class ItemConvertingEvent extends Event {
 	public HandlerList getHandlers() {
 		return handlers;
 	}
-	
+
 	/**
-	* This is a Bukkit method.
-	* @return Registered handlers to Bukkit
-	*/
-    public static HandlerList getHandlerList() {
-        return ItemConvertingEvent.handlers;
-    }
+	 * This is a Bukkit method.
+	 * 
+	 * @return Registered handlers to Bukkit
+	 */
+	public static HandlerList getHandlerList() {
+		return ItemConvertingEvent.handlers;
+	}
 }

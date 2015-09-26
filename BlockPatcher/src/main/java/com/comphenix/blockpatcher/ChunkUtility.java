@@ -15,9 +15,10 @@ import com.comphenix.protocol.utility.MinecraftReflection;
  */
 @SuppressWarnings("unchecked")
 class ChunkUtility {
-	
+
 	/**
 	 * Re-transmit the given chunk to the given player.
+	 * 
 	 * @param player - the given player.
 	 * @param chunkX - the chunk x coordinate.
 	 * @param chunkZ - the chunk z coordinate.
@@ -25,16 +26,15 @@ class ChunkUtility {
 	public static void resendChunk(Player player, int chunkX, int chunkZ) {
 		BukkitUnwrapper unwrapper = new BukkitUnwrapper();
 		Object entityPlayer = unwrapper.unwrapItem(player);
-		
+
 		Class<?> chunkCoord = MinecraftReflection.getMinecraftClass("ChunkCoordIntPair");
-		
+
 		try {
-			List<Object> list = (List<Object>) FuzzyReflection.fromObject(entityPlayer).
-								getFieldByName("chunkCoordIntPairQueue").get(entityPlayer);
-			
+			List<Object> list = (List<Object>) FuzzyReflection.fromObject(entityPlayer).getFieldByName("chunkCoordIntPairQueue").get(entityPlayer);
+
 			// Add a chunk coord int pair
 			list.add(chunkCoord.getConstructor(int.class, int.class).newInstance(chunkX, chunkZ));
-			
+
 		} catch (Exception e) {
 			throw new RuntimeException("Cannot read chunk coord pair queue.", e);
 		}

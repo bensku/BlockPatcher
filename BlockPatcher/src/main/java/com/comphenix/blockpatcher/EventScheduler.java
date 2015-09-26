@@ -9,7 +9,7 @@ import com.comphenix.blockpatcher.events.ItemConvertingEvent;
 import com.comphenix.blockpatcher.lookup.SegmentLookup;
 
 class EventScheduler {
-	
+
 	private PluginManager manager;
 
 	public EventScheduler(PluginManager manager) {
@@ -21,9 +21,10 @@ class EventScheduler {
 		ItemConvertingEvent event = new ItemConvertingEvent(stacks, player, fromInventory);
 		manager.callEvent(event);
 	}
-	
+
 	/**
 	 * Retrieve the lookup table given this player and the provided list of block coordinates.
+	 * 
 	 * @param baseLookup - the default lookup table.
 	 * @param player - the current player.
 	 * @param chunkX - current chunk x position.

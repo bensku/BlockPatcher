@@ -26,7 +26,7 @@ import com.google.common.collect.MapMaker;
 
 class BlockMismatchFixer {
 	private Plugin plugin;
-	
+
 	// Last known block type
 	private ConcurrentMap<Player, Double> deltaY = new MapMaker().weakKeys().makeMap();
 
@@ -35,7 +35,7 @@ class BlockMismatchFixer {
 
 	// For retrieving the cached conversion
 	private ConversionCache cache;
-	
+
 	// Looking up block height
 	private final BlockHeight heightLookup;
 
@@ -46,11 +46,10 @@ class BlockMismatchFixer {
 		registerBukkitListener();
 		registerPacketListener();
 	}
-	
+
 	private void registerPacketListener() {
 		// This is executed asynchronously
-		ProtocolLibrary.getProtocolManager().addPacketListener(
-		  packetListener = new PacketAdapter(plugin, FLYING, POSITION, POSITION_LOOK) {
+		ProtocolLibrary.getProtocolManager().addPacketListener(packetListener = new PacketAdapter(plugin, FLYING, POSITION, POSITION_LOOK) {
 			@Override
 			public void onPacketReceiving(PacketEvent event) {
 				Double delta = deltaY.get(event.getPlayer());
@@ -68,41 +67,39 @@ class BlockMismatchFixer {
 			}
 		});
 	}
-	
+
 	private void registerBukkitListener() {
-		plugin.getServer().getPluginManager().registerEvents(
-		  bukkitListener = new Listener() {
+		plugin.getServer().getPluginManager().registerEvents(bukkitListener = new Listener() {
 			@EventHandler
 			public void onPlayerMove(PlayerMoveEvent e) {
 				updateLookupDelta(e.getTo(), e.getPlayer());
 			}
-			
+
 			@EventHandler
 			public void onPlayerLogin(PlayerLoginEvent e) {
 				updateLookupDelta(e.getPlayer().getLocation(), e.getPlayer());
 			}
 		}, plugin);
 	}
-	
+
 	private void updateLookupDelta(Location loc, Player player) {
 		final Block underneath = getStandingBlock(loc);
-		final SegmentLookup lookup = cache.loadCacheOrDefault(
-			player, underneath.getX() >> 4, underneath.getY() >> 4);
-		
+		final SegmentLookup lookup = cache.loadCacheOrDefault(player, underneath.getX() >> 4, underneath.getY() >> 4);
+
 		final Material serverMaterial = underneath.getType();
 		@SuppressWarnings("deprecation")
 		final Material clientMaterial = Material.getMaterial(lookup.getBlockLookup(serverMaterial.getId()));
-		
+
 		if (serverMaterial != clientMaterial) {
 			deltaY.put(player, heightLookup.getHeight(serverMaterial) - heightLookup.getHeight(clientMaterial));
 		} else {
 			deltaY.remove(player);
 		}
 	}
-	
+
 	private Block getStandingBlock(Location loc) {
 		Block foot = loc.getBlock();
-		
+
 		// Usually because the block is shorter in height
 		if (foot.getType().isSolid())
 			return foot;
@@ -114,8 +111,7 @@ class BlockMismatchFixer {
 	 */
 	public void close() {
 		if (plugin != null) {
-			ProtocolLibrary.getProtocolManager().
-				removePacketListener(packetListener);
+			ProtocolLibrary.getProtocolManager().removePacketListener(packetListener);
 			PlayerMoveEvent.getHandlerList().unregister(bukkitListener);
 			plugin = null;
 		}
