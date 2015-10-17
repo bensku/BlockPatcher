@@ -19,6 +19,7 @@
  */
 package com.comphenix.blockpatcher;
 
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.World.Environment;
@@ -36,6 +37,7 @@ import com.comphenix.protocol.utility.MinecraftReflection;
 import com.comphenix.protocol.utility.MinecraftVersion;
 import com.comphenix.protocol.wrappers.BlockPosition;
 import com.comphenix.protocol.wrappers.ChunkCoordIntPair;
+import com.comphenix.protocol.wrappers.MultiBlockChangeInfo;
 import com.comphenix.protocol.wrappers.WrappedBlockData;
 import com.comphenix.protocol.wrappers.WrappedDataWatcher;
 
@@ -243,13 +245,32 @@ class Calculations {
 	}
 
 	public void translateMultiBlockChange(PacketContainer packet, Player player) throws FieldAccessException {
-		StructureModifier<byte[]> byteArrays = packet.getSpecificModifier(byte[].class);
 		ChunkCoordIntPair coord = getChunkCoordinate(packet);
-
-		byte[] data = byteArrays.read(0);
 
 		// Get the correct table
 		SegmentLookup lookup = cache.loadCacheOrDefault(player, coord.getChunkX(), coord.getChunkZ());
+
+		StructureModifier<MultiBlockChangeInfo[]> infoArrays = packet.getMultiBlockChangeInfoArrays();
+		MultiBlockChangeInfo[] array = infoArrays.readSafely(0);
+		if (array != null) {
+			for (MultiBlockChangeInfo info : array) {
+				Location location = info.getLocation(null);
+
+				WrappedBlockData blockData = info.getData();
+				Material type = blockData.getType();
+				int data = blockData.getData();
+
+				data = lookup.getDataLookup(type.getId(), data, location.getBlockY());
+				type = Material.getMaterial(lookup.getBlockLookup(type.getId(), location.getBlockY()));
+				blockData.setTypeAndData(type, data);
+				info.setData(blockData);
+			}
+
+			return;
+		}
+
+		StructureModifier<byte[]> byteArrays = packet.getSpecificModifier(byte[].class);
+		byte[] data = byteArrays.read(0);
 
 		// Each updated block is stored sequentially in 4 byte sized blocks.
 		// The content of these bytes are as follows:
@@ -464,7 +485,6 @@ class Calculations {
 
 								// Update the lower nibble
 								output |= view.getDataLookup(blockID, blockData) << 4;
-								;
 
 								// Write the result
 								info.data[dataIndex] = (byte) (output & 0xFF);
@@ -487,21 +507,8 @@ class Calculations {
 		// We're done
 	}
 
-	// Added to ProtocolLib
-	/*
-	 * private static class ChunkCoordInt { private static FieldAccessor COORD_X; private static FieldAccessor COORD_Z; public final int x; public final int z; /** Construct a new chunk coordinate.
-	 * @param x - the x index of the chunk.
-	 * @param z - the z index of the chunk.
-	 *//*
-		 * public ChunkCoordInt(int x, int z) { this.x = x; this.z = z; } /** Retrieve a new chunk coord from an object handle.
-		 * @param handle - the handle.
-		 * @return The chunk coordinate.
-		 *//*
-			 * public static ChunkCoordInt fromHandle(Object handle) { if (COORD_X == null || COORD_Z == null) { COORD_X = Accessors.getFieldAccessor(handle.getClass(), "x", true); COORD_Z = Accessors.getFieldAccessor(handle.getClass(), "z", true); } return new ChunkCoordInt( (Integer) COORD_X.get(handle), (Integer) COORD_Z.get(handle) ); } }
-			 */
-
 	// Unused
-	/*
-	 * public static double getMilliseconds(Stopwatch watch) { return watch.elapsed(TimeUnit.NANOSECONDS) / 1000000.0; }
-	 */
+	/* public static double getMilliseconds(Stopwatch watch) {
+		return watch.elapsed(TimeUnit.NANOSECONDS) / 1000000.0;
+	} */
 }
