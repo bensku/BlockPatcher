@@ -9,7 +9,7 @@
   <description>Allow unmodified clients to connect to a server with custom blocks.</description>
 
   <properties>
-    <project.build.sourceEncoding>cp1252</project.build.sourceEncoding>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
   <repositories>
