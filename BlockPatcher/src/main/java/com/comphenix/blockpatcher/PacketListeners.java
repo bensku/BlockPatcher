@@ -33,14 +33,14 @@ class PacketListeners {
 		ProtocolManager manager = ProtocolLibrary.getProtocolManager();
 
 		// Modify chunk packets asynchronously
-		manager.getAsynchronousManager().registerAsyncHandler(new PacketAdapter(plugin, ListenerPriority.HIGHEST, MAP_CHUNK, MAP_CHUNK_BULK, UPDATE_SIGN, TILE_ENTITY_DATA) {
+		manager.getAsynchronousManager().registerAsyncHandler(new PacketAdapter(plugin, ListenerPriority.HIGHEST, MAP_CHUNK, UPDATE_SIGN, TILE_ENTITY_DATA) {
 			@Override
 			public void onPacketSending(PacketEvent event) {
 				try {
 					if (event.getPacketType() == MAP_CHUNK) {
 						calculations.translateMapChunk(event.getPacket(), event.getPlayer());
-					} else if (event.getPacketType() == MAP_CHUNK_BULK) {
-						calculations.translateMapChunkBulk(event.getPacket(), event.getPlayer());
+					//} else if (event.getPacketType() == MAP_CHUNK_BULK) {
+					//	calculations.translateMapChunkBulk(event.getPacket(), event.getPlayer());
 					} else {
 						// Update sign or tile entity data - these are only enqueued so they 
 						// are sent in the correct order
@@ -63,7 +63,7 @@ class PacketListeners {
 		}
 
 		// These are small enough to be run on the main thread
-		manager.addPacketListener(new PacketAdapter(plugin, ListenerPriority.HIGHEST, MAP_CHUNK, MAP_CHUNK_BULK, BLOCK_CHANGE, MULTI_BLOCK_CHANGE, SPAWN_ENTITY, SET_SLOT, WINDOW_ITEMS) {
+		manager.addPacketListener(new PacketAdapter(plugin, ListenerPriority.HIGHEST, MAP_CHUNK, BLOCK_CHANGE, MULTI_BLOCK_CHANGE, SPAWN_ENTITY, SET_SLOT, WINDOW_ITEMS) {
 			public void onPacketSending(PacketEvent event) {
 				try {
 					PacketContainer packet = event.getPacket();
@@ -75,8 +75,8 @@ class PacketListeners {
 					if (type == MAP_CHUNK) {
 						if (calculations.isImportantChunk(packet, player))
 							event.getAsyncMarker().setNewSendingIndex(0);
-					} else if (type == MAP_CHUNK_BULK) {
-						if (calculations.isImportantChunkBulk(packet, player))
+					//} else if (type == MAP_CHUNK_BULK) {
+					//	if (calculations.isImportantChunkBulk(packet, player))
 							event.getAsyncMarker().setNewSendingIndex(0);
 					} else if (type == BLOCK_CHANGE) {
 						calculations.translateBlockChange(packet, player);
