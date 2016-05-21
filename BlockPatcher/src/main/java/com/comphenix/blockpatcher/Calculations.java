@@ -19,6 +19,8 @@
  */
 package com.comphenix.blockpatcher;
 
+import java.util.Arrays;
+
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -69,6 +71,7 @@ class Calculations {
 	private static final int NIBBLES_REQUIRED = 4;
 	private static final int BIOME_ARRAY_LENGTH = 256;
 	private static boolean atLeast18 = MinecraftVersion.getCurrentVersion().isAtLeast(MinecraftVersion.BOUNTIFUL_UPDATE);
+	private static boolean atLeast19 = MinecraftVersion.getCurrentVersion().isAtLeast(MinecraftVersion.COMBAT_UPDATE);
 
 	// Used to get a chunk's specific lookup table
 	private EventScheduler scheduler;
@@ -161,8 +164,21 @@ class Calculations {
 		StructureModifier<byte[]> byteArray = packet.getSpecificModifier(byte[].class);
 
 		ChunkInfo info = new ChunkInfo();
+		
+		if (atLeast19) { // 1.9 apparently reverted some 1.8 changes
+			info.player = player;
+			info.chunkX = ints.read(0); // packet.a
+			info.chunkZ = ints.read(1); // packet.b
 
-		if (atLeast18) {
+			Object chunkMap = packet.getModifier().read(2);
+			StructureModifier<Object> modifier = new StructureModifier<Object>(chunkMap.getClass()).withTarget(chunkMap);
+			info.data = byteArray.read(0);
+			info.chunkMask = 1;
+			info.extraMask = -1;						 // Not in 1.8/1.9
+
+			info.hasContinous = packet.getBooleans().readSafely(0); // packet.d
+			info.startIndex = 0;
+		} else if (atLeast18) {
 			info.player = player;
 			info.chunkX = ints.read(0); // packet.a
 			info.chunkZ = ints.read(1); // packet.b
@@ -309,9 +325,16 @@ class Calculations {
 	public void translateFallingObject(PacketContainer packet, Player player) throws FieldAccessException {
 
 		StructureModifier<Integer> ints = packet.getSpecificModifier(int.class);
-
-		int type = ints.read(7);
-		int data = ints.read(8);
+		
+		int type = 0;
+		int data = 0;
+		if (atLeast19) {
+			type = ints.read(6);
+			data = ints.read(7);
+		} else {
+			type = ints.read(7);
+			data = ints.read(8);
+		}
 
 		// Falling object (only block ID)
 		if (type == 70) {
@@ -323,7 +346,10 @@ class Calculations {
 			ConversionLookup lookup = cache.loadCacheOrDefault(player, x >> 4, y >> 4, z >> 4);
 
 			data = lookup.getBlockLookup(data);
-			ints.write(8, data);
+			if (atLeast19)
+				ints.write(7, data);
+			else
+				ints.write(8, data);
 		}
 	}
 
