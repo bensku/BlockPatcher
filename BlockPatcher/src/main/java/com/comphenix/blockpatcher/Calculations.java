@@ -173,7 +173,7 @@ class Calculations {
 			Object chunkMap = packet.getModifier().read(2);
 			StructureModifier<Object> modifier = new StructureModifier<Object>(chunkMap.getClass()).withTarget(chunkMap);
 			info.data = byteArray.read(0);
-			info.chunkMask = 1;
+			info.chunkMask = ints.read(2);
 			info.extraMask = -1;						 // Not in 1.8/1.9
 
 			info.hasContinous = packet.getBooleans().readSafely(0); // packet.d
@@ -499,24 +499,24 @@ class Calculations {
 
 							// Transform block
 							info.data[blockIndex] = (byte) view.getBlockLookup(blockID);
-
-							if ((blockIndex & 0x1) == 0) {
-								int blockData = info.data[dataIndex] & 0xF;
-
-								// Update the higher nibble
-								output |= view.getDataLookup(blockID, blockData);
-
-							} else {
-								int blockData = (info.data[dataIndex] >> 4) & 0xF;
-
-								// Update the lower nibble
-								output |= view.getDataLookup(blockID, blockData) << 4;
-
-								// Write the result
-								info.data[dataIndex] = (byte) (output & 0xFF);
-								output = 0;
-								dataIndex++;
-							}
+							
+//							if ((blockIndex & 0x1) == 0) {
+//								int blockData = info.data[dataIndex] & 0xF;
+//
+//								// Update the higher nibble
+//								output |= view.getDataLookup(blockID, blockData);
+//
+//							} else {
+//								int blockData = (info.data[dataIndex] >> 4) & 0xF;
+//
+//								// Update the lower nibble
+//								output |= view.getDataLookup(blockID, blockData) << 4;
+//
+//								// Write the result
+//								info.data[dataIndex] = (byte) (output & 0xFF);
+//								output = 0;
+//								dataIndex++;
+//							}
 
 							blockIndex++;
 						}
