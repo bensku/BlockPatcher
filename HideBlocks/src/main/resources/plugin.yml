@@ -1,0 +1,9 @@
+name: HideBlocks
+version: 0.0.1-SNAPSHOT
+description: Front end for BlockPatcher.
+author: bensku
+website: https://github.com/bensku/BlockPatcher
+
+main: fi.maailmanloppu.hideblocks.HideBlockMod
+depend: [BlockPatcher]
+database: false

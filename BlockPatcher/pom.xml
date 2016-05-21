@@ -17,6 +17,10 @@
       <id>dmulloy2-repo</id>
       <url>http://repo.dmulloy2.net/content/groups/public/</url>
     </repository>
+    <repository>
+      <id>spigot-repo</id>
+      <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
+    </repository>
   </repositories>
 
   <distributionManagement>
@@ -81,7 +85,8 @@
     <dependency>
       <groupId>org.spigotmc</groupId>
       <artifactId>spigot</artifactId>
-      <version>1.8.8-R0.1-SNAPSHOT</version>
+      <version>1.9.4-R0.1-SNAPSHOT</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.comphenix.protocol</groupId>
