@@ -42,6 +42,7 @@ import com.comphenix.protocol.wrappers.ChunkCoordIntPair;
 import com.comphenix.protocol.wrappers.MultiBlockChangeInfo;
 import com.comphenix.protocol.wrappers.WrappedBlockData;
 import com.comphenix.protocol.wrappers.WrappedDataWatcher;
+import com.mysql.fabric.xmlrpc.base.Array;
 
 /**
  * Used to translate block IDs.
@@ -474,7 +475,8 @@ class Calculations {
 		int dataOffset = idOffset + info.chunkSectionNumber * 4096;
 
 		// Stopwatch watch = Stopwatch.createStarted();
-
+		
+		//System.out.println(info.data.length);
 		for (int i = 0; i < 16; i++) {
 			// If the bitmask indicates this chunk is sent
 			if ((info.chunkMask & 1 << i) > 0) {
@@ -490,15 +492,36 @@ class Calculations {
 
 				// Stores the extra value
 				int output = 0;
-
+				
+				int skipCounter = 0;
 				for (int y = 0; y < 16; y++) {
 					for (int z = 0; z < 16; z++) {
 						for (int x = 0; x < 16; x++) {
+							if (skipCounter != 0) {
+								blockIndex++;
+								skipCounter--;
+								continue;
+							}
 
-							int blockID = info.data[blockIndex] & 0xFF;
+							int b = info.data[blockIndex]; // This byte in the array
+							int blockId = 0;
+							if ((b & -128) == 0) { // Current byte contains everything
+								blockId = b;
+								System.out.println("Read small block: " + blockId);
+							} else {
+								skipCounter--;
+								for (int pos = 0; pos < 2; pos++) {
+									int extra = info.data[blockIndex+pos];
+									extra &= 127; // 127=01111111; 1xxxxxxx & 01111111 = 0xxxxxxx - see below
+									blockId |= extra;
+									blockId <<= 7; // Move only 7; first bit is guaranteed 0 so doesn't change anything
+									skipCounter++;
+								}
+								System.out.println("Read large block: " + blockId);
+							}
 
 							// Transform block
-							info.data[blockIndex] = (byte) view.getBlockLookup(blockID);
+							//info.data[blockIndex] = (byte) view.getBlockLookup(blockID);
 							
 //							if ((blockIndex & 0x1) == 0) {
 //								int blockData = info.data[dataIndex] & 0xF;
