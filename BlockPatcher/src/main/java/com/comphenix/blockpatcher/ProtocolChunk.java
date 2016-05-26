@@ -11,7 +11,7 @@ import com.comphenix.protocol.utility.StreamSerializer;
  * byte array, so reading lots of values might be slow. Works
  * with Minecraft 1.9's protocol (and maybe in future versions, too).
  * 
- * See <a href="http://wiki.vg/SMP_Map_Format>SMP Map Format</a> for
+ * See <a href="http://wiki.vg/SMP_Map_Format">SMP Map Format</a> for
  * more information.
  * 
  * This snippet is licensed under MIT license, even if BlockPatcher is not.
@@ -22,6 +22,25 @@ public class ProtocolChunk {
 	
 	public static final int LIGHT_DATA = 2048; // Byte array size
 	public static final int WORLD_HEIGHT = 16; // World height in chunk sections (16 blocks)
+	
+	/**
+	 * Gets protocol block id, which contains block id and meta.
+	 * @param blockId Normal block id.
+	 * @param meta Metadata (0 is allowed)
+	 * @return Protocol block id.
+	 */
+	public static int getProtocolId(int blockId, int meta) {
+		return blockId << 4 | meta;
+	}
+	
+	/**
+	 * Gets protocol block id, which contains block id and default meta.
+	 * @param blockId Normal block id.
+	 * @return Protocol block id.
+	 */
+	public static int getProtocolId(int blockId) {
+		return getProtocolId(blockId, 0);
+	}
 	
 	private byte[] buf;
 	private StreamSerializer mcSerializer;
@@ -45,6 +64,15 @@ public class ProtocolChunk {
 		return this;
 	}
 	
+	/**
+	 * Chunk section, aka 16x16x16 (4096) blocks. Remember to call
+	 * {@link #read()} first, it parses the data to usable form.
+	 * 
+	 * All block ids used are protocal block ids. You can use
+	 * {@link ProtocolChunk#getProtocolId(int, int)} to get them for you.
+	 * Note that some operations here are quite heavy, so be careful.
+	 *
+	 */
 	public class Section {
 		
 		private DataInputStream is;
@@ -155,13 +183,99 @@ public class ProtocolChunk {
 			
 			int bits = 0; // We hold bits here for later parsing
 			long current = data[start]; // Current long where data is fetched
-			current >>>= (pos - gone);
+			int innerPos = pos - gone;
+			current >>>= innerPos;
 			for (int i = 0; i < bitsPerBlock; i++) {
+				if (innerPos > 63) {
+					start += 1;
+					current = data[start];
+				}
+				
 				bits |= current & 1; // 1 == ...00000001; AND sets everything else to 0; 1 or 0 is added to bits
+				current >>>= 1;
 				bits <<= 1;
+				innerPos++;
 			}
 			
-			return -1;
+			return bits;
+		}
+		
+		/**
+		 * Sets block at given index to given value.
+		 * @param index Index
+		 * @param block Block id.
+		 */
+		public void setBlock(int index, int block) {
+			int pos = index * bitsPerBlock;
+			int gone = 0;
+			
+			int start = 0;
+			for (int i = 0; i * 64 < pos; i++) {
+				gone += 64; // One long is 64 bits
+				start = i;
+			}
+			
+			long current = data[start]; // Current long where data is fetched
+			int innerPos = pos - gone;
+			current >>>= innerPos;
+			for (int i = 0; i < bitsPerBlock; i++) {
+				if (innerPos > 63) {
+					start += 1;
+					data[start] = current;
+					current = data[start];
+					innerPos = 0;
+				}
+				
+				current |= index & 1 << 63 - innerPos;
+				index >>>= 1;
+				innerPos++;
+			}
+			
+			data[start] = current;
+		}
+		
+		/**
+		 * Gets index for block at chunk coordinates given.
+		 * @param x X coordinate.
+		 * @param y Y coordinate.
+		 * @param z Z coordinate.
+		 * @return Index for other methods.
+		 */
+	    public int getIndex(int x, int y, int z) {
+	        return y << 8 | z << 4 | x;
+	    }
+		
+	    /**
+	     * Replaces all entries of a block with given replacement.
+	     * This has way better performance than your DIY loops might get, so
+	     * use it if you can.
+	     * @param from Block to change.
+	     * @param to Result block.
+	     */
+		public void massReplace(int from, int to) {
+			int block = 0;
+			int len = 0;
+			long current = 0;
+			int pos = 0;
+			for (int i = 0; i < data.length; i++) {
+				current = data[i];
+				for (int in = 0; in < 64; in++) {
+					if (len == bitsPerBlock) { // Parse the data
+						if (block == from) {
+							setBlock(pos, to);
+						}
+						
+						pos += len;
+						len = 0;
+						block = 0;
+					}
+					
+					block |= current & 1;
+					block <<= 1;
+					current >>>= 1;
+					len++;
+				}
+			}
 		}
 
 	}
