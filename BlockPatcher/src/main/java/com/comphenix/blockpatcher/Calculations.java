@@ -64,6 +64,7 @@ class Calculations {
 		public int startIndex;
 		public int size;
 		public int blockSize;
+		public boolean skylight;
 	}
 
 	// Useful Minecraft constants
@@ -427,6 +428,7 @@ class Calculations {
 		// There's no sun/moon in the end or in the nether, so Minecraft doesn't sent any skylight information
 		// This optimization was added in 1.4.6. Note that ideally you should get this from the "f" (skylight) field.
 		int skylightCount = info.player.getWorld().getEnvironment() == Environment.NORMAL ? 1 : 0;
+		info.skylight = skylightCount == 1;
 
 		// The total size of a chunk is the number of blocks sent (depends on the number of sections) multiplied by the
 		// amount of bytes per block. This last figure can be calculated by adding together all the data parts:
@@ -468,88 +470,13 @@ class Calculations {
 	}
 
 	private void translate(SegmentLookup lookup, ChunkInfo info) {
-		// Loop over 16x16x16 chunks in the 16x256x16 column
-		int idIndexModifier = 0;
-
-		int idOffset = info.startIndex;
-		int dataOffset = idOffset + info.chunkSectionNumber * 4096;
-
-		// Stopwatch watch = Stopwatch.createStarted();
+		ProtocolChunk chunk = new ProtocolChunk(info.data, info.skylight);
+		chunk.read();
 		
-		//System.out.println(info.data.length);
-		for (int i = 0; i < 16; i++) {
-			// If the bitmask indicates this chunk is sent
-			if ((info.chunkMask & 1 << i) > 0) {
-
-				ConversionLookup view = lookup.getSegmentView(i);
-
-				int relativeIDStart = idIndexModifier * 4096;
-				int relativeDataStart = idIndexModifier * 2048;
-
-				//boolean useExtraData = (info.extraMask & (1 << i)) > 0;
-				int blockIndex = idOffset + relativeIDStart;
-				int dataIndex = dataOffset + relativeDataStart;
-
-				// Stores the extra value
-				int output = 0;
-				
-				int skipCounter = 0;
-				for (int y = 0; y < 16; y++) {
-					for (int z = 0; z < 16; z++) {
-						for (int x = 0; x < 16; x++) {
-							if (skipCounter != 0) {
-								blockIndex++;
-								skipCounter--;
-								continue;
-							}
-
-							int b = info.data[blockIndex]; // This byte in the array
-							int blockId = 0;
-							if ((b & -128) == 0) { // Current byte contains everything
-								blockId = b;
-								System.out.println("Read small block: " + blockId);
-							} else {
-								skipCounter--;
-								for (int pos = 0; pos < 2; pos++) {
-									int extra = info.data[blockIndex+pos];
-									extra &= 127; // 127=01111111; 1xxxxxxx & 01111111 = 0xxxxxxx - see below
-									blockId |= extra;
-									blockId <<= 7; // Move only 7; first bit is guaranteed 0 so doesn't change anything
-									skipCounter++;
-								}
-								System.out.println("Read large block: " + blockId);
-							}
-
-							// Transform block
-							//info.data[blockIndex] = (byte) view.getBlockLookup(blockID);
-							
-//							if ((blockIndex & 0x1) == 0) {
-//								int blockData = info.data[dataIndex] & 0xF;
-//
-//								// Update the higher nibble
-//								output |= view.getDataLookup(blockID, blockData);
-//
-//							} else {
-//								int blockData = (info.data[dataIndex] >> 4) & 0xF;
-//
-//								// Update the lower nibble
-//								output |= view.getDataLookup(blockID, blockData) << 4;
-//
-//								// Write the result
-//								info.data[dataIndex] = (byte) (output & 0xFF);
-//								output = 0;
-//								dataIndex++;
-//							}
-
-							blockIndex++;
-						}
-					}
-				}
-
-				idIndexModifier++;
-			}
+		byte[] blockLookup = lookup.getBlockLookup();
+		for (int i = 0; i < blockLookup.length; i++) {
+			chunk.replaceAll(ProtocolChunk.getProtocolId(i), ProtocolChunk.getProtocolId(blockLookup[i]));
 		}
-
 		// watch.stop();
 		// System.out.println(String.format("Processed x: %s, z: %s in %s ms.", info.chunkX, info.chunkZ, getMilliseconds(watch)));
 

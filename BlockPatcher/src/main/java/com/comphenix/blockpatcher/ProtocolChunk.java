@@ -1,7 +1,9 @@
 package com.comphenix.blockpatcher;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 
 import com.comphenix.protocol.utility.StreamSerializer;
@@ -22,6 +24,7 @@ public class ProtocolChunk {
 	
 	public static final int LIGHT_DATA = 2048; // Byte array size
 	public static final int WORLD_HEIGHT = 16; // World height in chunk sections (16 blocks)
+	public static final int PALETTE_FREE = 10; // Additional space reserved in palette array by default
 	
 	/**
 	 * Gets protocol block id, which contains block id and meta.
@@ -58,10 +61,32 @@ public class ProtocolChunk {
 	public ProtocolChunk read() {
 		DataInputStream is = new DataInputStream(new ByteArrayInputStream(buf));
 		for (int i = 0; i < WORLD_HEIGHT; i++) {
-			sections[i] = new Section(is).read();
+			sections[i] = new Section().read(is);
 		}
 		
 		return this;
+	}
+	
+	public byte[] write() {
+		ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		DataOutputStream os = new DataOutputStream(bos);
+		for (int i = 0; i < WORLD_HEIGHT; i++) {
+			sections[i].write(os);
+		}
+		
+		return bos.toByteArray();
+	}
+	
+	/**
+	 * Replaces all blocks of given id. This is faster than finding those
+	 * blocks yourself and manually editing them.
+	 * @param from Replaced block.
+	 * @param to Replacement block.
+	 */
+	public void replaceAll(int from, int to) {
+		for (int i = 0; i < WORLD_HEIGHT; i++) {
+			sections[i].replaceAll(from, to);
+		}
 	}
 	
 	/**
@@ -74,29 +99,28 @@ public class ProtocolChunk {
 	 *
 	 */
 	public class Section {
-		
-		private DataInputStream is;
 
 		public int bitsPerBlock;
 		public int[] palette;
+		public int paletteFree;
 		public long[] data;
 		public byte[] blockLight;
 		public byte[] skylight;
 
-		public Section(DataInputStream is) {
-			this.is = is;
+		public Section() {
+			
 		}
 
 		/**
 		 * Should be called before doing anything else.
 		 * @return This for chaining.
 		 */
-		public Section read() {
+		public Section read(DataInputStream is) {
 			try {
 				bitsPerBlock = is.readUnsignedByte();
 
 				int paletteLength = mcSerializer.deserializeVarInt(is);
-				palette = new int[paletteLength];
+				palette = new int[paletteLength + PALETTE_FREE];
 				for (int i = 0; i < paletteLength; i++) {
 					palette[i] = mcSerializer.deserializeVarInt(is);
 				}
@@ -125,6 +149,36 @@ public class ProtocolChunk {
 			return this;
 		}
 		
+		public Section write(DataOutputStream os) {
+			try {
+				os.writeByte(bitsPerBlock);
+				
+				mcSerializer.serializeVarInt(os, palette.length);
+				for (int i = 0; i < palette.length - paletteFree; i++) {
+					mcSerializer.serializeVarInt(os, palette[i]);
+				}
+				
+				mcSerializer.serializeVarInt(os, data.length);
+				for (long i : data) {
+					os.writeLong(i);
+				}
+				
+				for (int i = 0; i < LIGHT_DATA; i++) {
+					os.writeByte(blockLight[i]);
+				}
+				
+				if (hasSkylight) {
+					for (int i = 0; i < LIGHT_DATA; i++) {
+						os.writeByte(skylight[i]);
+					}
+				}
+			} catch (IOException e) {
+				throw new ChunkWriteException("Invalid chunk section (IOException)!");
+			}
+			
+			return this;
+		}
+		
 		/**
 		 * Gets palette type.
 		 * @return Palette type enum.
@@ -140,17 +194,30 @@ public class ProtocolChunk {
 		
 		/**
 		 * Gets palette id for given block id. If palette type is
-		 * GLOBAL, -1 is returned.
+		 * GLOBAL, given block id is returned.
 		 * @param blockId Block id.
-		 * @return Palette id or -1 if not found.
+		 * @return Palette id or given block id.
 		 */
 		public int getPaletteId(int blockId) {
+			if (bitsPerBlock > 8)
+				return blockId;
+			
 			for (int i = 0; i < palette.length; i++) {
 				if (palette[i] == blockId)
 					return i;
 			}
 			
-			return -1;
+			if (paletteFree == 0) {
+				int[] newPalette = new int[palette.length + PALETTE_FREE];
+				System.arraycopy(palette, 0, newPalette, 0, palette.length);
+				palette = newPalette;
+				paletteFree = PALETTE_FREE;
+			}
+			int pos = palette.length - paletteFree;
+			palette[pos] = blockId;
+			paletteFree--;
+			
+			return pos;
 		}
 		
 		/**
@@ -169,6 +236,7 @@ public class ProtocolChunk {
 		
 		/**
 		 * Gets block at given index.
+		 * @param index Index.
 		 * @return Palette id (not block id, usually!) of block.
 		 */
 		public int getBlock(int index) {
@@ -252,7 +320,7 @@ public class ProtocolChunk {
 	     * @param from Block to change.
 	     * @param to Result block.
 	     */
-		public void massReplace(int from, int to) {
+		public void replaceAll(int from, int to) {
 			int block = 0;
 			int len = 0;
 			long current = 0;
@@ -285,6 +353,15 @@ public class ProtocolChunk {
 		private static final long serialVersionUID = 3907261534758829959L; // By Eclipse
 		
 		public ChunkReadException(String cause) {
+			super(cause);
+		}
+	}
+	
+	public class ChunkWriteException extends RuntimeException {
+		
+		private static final long serialVersionUID = -643442627095677464L; // By Eclipse
+
+		public ChunkWriteException(String cause) {
 			super(cause);
 		}
 	}
