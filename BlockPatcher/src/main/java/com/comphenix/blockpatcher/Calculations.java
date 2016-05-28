@@ -65,6 +65,7 @@ class Calculations {
 		public int size;
 		public int blockSize;
 		public boolean skylight;
+		public StructureModifier<byte[]> byteArray;
 	}
 
 	// Useful Minecraft constants
@@ -166,6 +167,7 @@ class Calculations {
 		StructureModifier<byte[]> byteArray = packet.getSpecificModifier(byte[].class);
 
 		ChunkInfo info = new ChunkInfo();
+		info.byteArray = byteArray;
 		
 		if (atLeast19) { // 1.9 apparently reverted some 1.8 changes
 			info.player = player;
@@ -470,13 +472,23 @@ class Calculations {
 	}
 
 	private void translate(SegmentLookup lookup, ChunkInfo info) {
-		ProtocolChunk chunk = new ProtocolChunk(info.data, info.skylight);
+		ProtocolChunk chunk = new ProtocolChunk(info.data, info.skylight, info.chunkMask);
 		chunk.read();
 		
 		byte[] blockLookup = lookup.getBlockLookup();
 		for (int i = 0; i < blockLookup.length; i++) {
-			chunk.replaceAll(ProtocolChunk.getProtocolId(i), ProtocolChunk.getProtocolId(blockLookup[i]));
+			int value = blockLookup[i] & 0xFF;
+			if (value != i) {
+				//chunk.replaceAll(ProtocolChunk.getProtocolId(i), ProtocolChunk.getProtocolId(value));
+				//System.out.println("Replacing block");
+			}
 		}
+		byte[] buf = chunk.write();
+		for (int i = 0; i < buf.length; i++) {
+			if (buf[i] != info.data[i])
+				System.out.println("Different at " + i);
+		}
+		//info.byteArray.write(0, chunk.write());
 		// watch.stop();
 		// System.out.println(String.format("Processed x: %s, z: %s in %s ms.", info.chunkX, info.chunkZ, getMilliseconds(watch)));
 

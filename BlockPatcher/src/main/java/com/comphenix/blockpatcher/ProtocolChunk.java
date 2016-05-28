@@ -6,6 +6,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+import org.apache.commons.lang3.Validate;
+
 import com.comphenix.protocol.utility.StreamSerializer;
 
 /**
@@ -24,7 +26,8 @@ public class ProtocolChunk {
 	
 	public static final int LIGHT_DATA = 2048; // Byte array size
 	public static final int WORLD_HEIGHT = 16; // World height in chunk sections (16 blocks)
-	public static final int PALETTE_FREE = 10; // Additional space reserved in palette array by default
+	public static final int PALETTE_FREE = 1; // Additional space reserved in palette array by default
+	public static final int BIT_ARRAY_SIZE = 4096;
 	
 	/**
 	 * Gets protocol block id, which contains block id and meta.
@@ -48,20 +51,23 @@ public class ProtocolChunk {
 	private byte[] buf;
 	private StreamSerializer mcSerializer;
 	private boolean hasSkylight;
+	private int chunkMask;
 	
 	public Section[] sections;
 	
-	public ProtocolChunk(byte[] buf, boolean hasSkylight) {
+	public ProtocolChunk(byte[] buf, boolean hasSkylight, int chunkMask) {
 		this.buf = buf;
 		this.mcSerializer = StreamSerializer.getDefault();
 		this.hasSkylight = hasSkylight;
 		this.sections = new Section[WORLD_HEIGHT];
+		this.chunkMask = chunkMask;
 	}
 	
 	public ProtocolChunk read() {
 		DataInputStream is = new DataInputStream(new ByteArrayInputStream(buf));
 		for (int i = 0; i < WORLD_HEIGHT; i++) {
-			sections[i] = new Section().read(is);
+			if ((chunkMask & 1 << i) > 0)
+				sections[i] = new Section().read(is);
 		}
 		
 		return this;
@@ -70,8 +76,9 @@ public class ProtocolChunk {
 	public byte[] write() {
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
 		DataOutputStream os = new DataOutputStream(bos);
-		for (int i = 0; i < WORLD_HEIGHT; i++) {
-			sections[i].write(os);
+		for (int i = 0; i < sections.length; i++) {
+			if ((chunkMask & 1 << i) > 0)
+				sections[i].write(os);
 		}
 		
 		return bos.toByteArray();
@@ -79,13 +86,15 @@ public class ProtocolChunk {
 	
 	/**
 	 * Replaces all blocks of given id. This is faster than finding those
-	 * blocks yourself and manually editing them.
+	 * blocks yourself and manually editing them. Doesn't use palette ids.
 	 * @param from Replaced block.
 	 * @param to Replacement block.
 	 */
 	public void replaceAll(int from, int to) {
-		for (int i = 0; i < WORLD_HEIGHT; i++) {
-			sections[i].replaceAll(from, to);
+		for (int i = 0; i < sections.length; i++) {
+			Section sec = sections[i];
+			if ((chunkMask & 1 << i) > 0)
+				sec.replaceAll(sec.getPaletteId(from), sec.getPaletteId(to));
 		}
 	}
 	
@@ -106,6 +115,8 @@ public class ProtocolChunk {
 		public long[] data;
 		public byte[] blockLight;
 		public byte[] skylight;
+		
+		private long maxEntryValue;
 
 		public Section() {
 			
@@ -118,14 +129,17 @@ public class ProtocolChunk {
 		public Section read(DataInputStream is) {
 			try {
 				bitsPerBlock = is.readUnsignedByte();
+				maxEntryValue = (1L << bitsPerBlock) - 1L;
 
 				int paletteLength = mcSerializer.deserializeVarInt(is);
-				palette = new int[paletteLength + PALETTE_FREE];
+				//System.out.println("palette:" + paletteLength);
+				palette = new int[paletteLength];
 				for (int i = 0; i < paletteLength; i++) {
 					palette[i] = mcSerializer.deserializeVarInt(is);
 				}
 
 				int dataLength = mcSerializer.deserializeVarInt(is);
+				//System.out.println("data:" + dataLength);
 				data = new long[dataLength];
 				for (int i = 0; i < dataLength; i++) {
 					data[i] = is.readLong();
@@ -142,7 +156,9 @@ public class ProtocolChunk {
 						skylight[i] = is.readByte();
 					}
 				}
+				//System.out.println("read() done");
 			} catch (IOException e) {
+				//e.printStackTrace();
 				throw new ChunkReadException("Invalid chunk section (IOException)!");
 			}
 			
@@ -173,7 +189,7 @@ public class ProtocolChunk {
 					}
 				}
 			} catch (IOException e) {
-				throw new ChunkWriteException("Invalid chunk section (IOException)!");
+				//throw new ChunkWriteException("Invalid chunk section (IOException)!");
 			}
 			
 			return this;
@@ -240,32 +256,7 @@ public class ProtocolChunk {
 		 * @return Palette id (not block id, usually!) of block.
 		 */
 		public int getBlock(int index) {
-			int pos = index * bitsPerBlock;
-			int gone = 0;
-			
-			int start = 0;
-			for (int i = 0; i * 64 < pos; i++) {
-				gone += 64; // One long is 64 bits
-				start = i;
-			}
-			
-			int bits = 0; // We hold bits here for later parsing
-			long current = data[start]; // Current long where data is fetched
-			int innerPos = pos - gone;
-			current >>>= innerPos;
-			for (int i = 0; i < bitsPerBlock; i++) {
-				if (innerPos > 63) {
-					start += 1;
-					current = data[start];
-				}
-				
-				bits |= current & 1; // 1 == ...00000001; AND sets everything else to 0; 1 or 0 is added to bits
-				current >>>= 1;
-				bits <<= 1;
-				innerPos++;
-			}
-			
-			return bits;
+			return getAt(index);
 		}
 		
 		/**
@@ -274,32 +265,7 @@ public class ProtocolChunk {
 		 * @param block Block id.
 		 */
 		public void setBlock(int index, int block) {
-			int pos = index * bitsPerBlock;
-			int gone = 0;
-			
-			int start = 0;
-			for (int i = 0; i * 64 < pos; i++) {
-				gone += 64; // One long is 64 bits
-				start = i;
-			}
-			
-			long current = data[start]; // Current long where data is fetched
-			int innerPos = pos - gone;
-			current >>>= innerPos;
-			for (int i = 0; i < bitsPerBlock; i++) {
-				if (innerPos > 63) {
-					start += 1;
-					data[start] = current;
-					current = data[start];
-					innerPos = 0;
-				}
-				
-				current |= index & 1 << 63 - innerPos;
-				index >>>= 1;
-				innerPos++;
-			}
-			
-			data[start] = current;
+			setAt(index, block);
 		}
 		
 		/**
@@ -316,35 +282,54 @@ public class ProtocolChunk {
 	    /**
 	     * Replaces all entries of a block with given replacement.
 	     * This has way better performance than your DIY loops might get, so
-	     * use it if you can.
+	     * use it if you can. Uses palette ids.
 	     * @param from Block to change.
 	     * @param to Result block.
 	     */
 		public void replaceAll(int from, int to) {
-			int block = 0;
-			int len = 0;
-			long current = 0;
-			int pos = 0;
-			for (int i = 0; i < data.length; i++) {
-				current = data[i];
-				for (int in = 0; in < 64; in++) {
-					if (len == bitsPerBlock) { // Parse the data
-						if (block == from) {
-							setBlock(pos, to);
-						}
-						
-						pos += len;
-						len = 0;
-						block = 0;
-					}
-					
-					block |= current & 1;
-					block <<= 1;
-					current >>>= 1;
-					len++;
-				}
+			for (int i = 0; i < BIT_ARRAY_SIZE; i++) {
+				int block = getAt(i);
+				if (block == from)
+					setAt(i, to);
 			}
 		}
+		
+	    /**
+	     * Sets the entry at the given location to the given value
+	     */
+	    private void setAt(int index, int value) {
+	        int i = index * this.bitsPerBlock;
+	        int j = i / 64;
+	        int k = ((index + 1) * this.bitsPerBlock - 1) / 64;
+	        int l = i % 64;
+	        this.data[j] = this.data[j] & ~(this.maxEntryValue << l) | ((long)value & this.maxEntryValue) << l;
+
+	        if (j != k) {
+	            int i1 = 64 - l;
+	            int j1 = this.bitsPerBlock - i1;
+	            this.data[k] = this.data[k] >>> j1 << j1 | ((long)value & this.maxEntryValue) >> i1;
+	        }
+	    }
+
+	    /**
+	     * Gets the entry at the given index
+	     */
+	    private int getAt(int index) {
+	        Validate.inclusiveBetween(0L, (long)(BIT_ARRAY_SIZE - 1), (long)index);
+	        int i = index * this.bitsPerBlock;
+	        int j = i / 64;
+	        int k = ((index + 1) * this.bitsPerBlock - 1) / 64;
+	        int l = i % 64;
+
+	        if (j == k) {
+	            return (int)(this.data[j] >>> l & this.maxEntryValue);
+	        }
+	        else
+	        {
+	            int i1 = 64 - l;
+	            return (int)((this.data[j] >>> l | this.data[k] << i1) & this.maxEntryValue);
+	        }
+	    }
 
 	}
 	
