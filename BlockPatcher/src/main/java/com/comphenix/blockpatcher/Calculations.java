@@ -429,7 +429,11 @@ class Calculations {
 
 		// There's no sun/moon in the end or in the nether, so Minecraft doesn't sent any skylight information
 		// This optimization was added in 1.4.6. Note that ideally you should get this from the "f" (skylight) field.
-		int skylightCount = info.player.getWorld().getEnvironment() == Environment.NORMAL ? 1 : 0;
+		int skylightCount;
+		if (info.player != null)
+			skylightCount = info.player.getWorld().getEnvironment() == Environment.NORMAL ? 1 : 0;
+		else
+			skylightCount = 1;
 		info.skylight = skylightCount == 1;
 
 		// The total size of a chunk is the number of blocks sent (depends on the number of sections) multiplied by the
@@ -479,16 +483,16 @@ class Calculations {
 		for (int i = 0; i < blockLookup.length; i++) {
 			int value = blockLookup[i] & 0xFF;
 			if (value != i) {
-				//chunk.replaceAll(ProtocolChunk.getProtocolId(i), ProtocolChunk.getProtocolId(value));
+				chunk.replaceAll(ProtocolChunk.getProtocolId(i), ProtocolChunk.getProtocolId(value));
 				//System.out.println("Replacing block");
 			}
 		}
 		byte[] buf = chunk.write();
-		for (int i = 0; i < buf.length; i++) {
-			if (buf[i] != info.data[i])
-				System.out.println("Different at " + i);
-		}
-		//info.byteArray.write(0, chunk.write());
+//		for (int i = 0; i < buf.length; i++) {
+//			if (buf[i] != info.data[i])
+//				System.out.println("Different at " + i + ": " + buf[i] + " != " + info.data[i]);
+//		}
+		info.byteArray.write(0, buf);
 		// watch.stop();
 		// System.out.println(String.format("Processed x: %s, z: %s in %s ms.", info.chunkX, info.chunkZ, getMilliseconds(watch)));
 

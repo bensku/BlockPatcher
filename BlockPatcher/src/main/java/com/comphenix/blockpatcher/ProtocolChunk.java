@@ -26,8 +26,9 @@ public class ProtocolChunk {
 	
 	public static final int LIGHT_DATA = 2048; // Byte array size
 	public static final int WORLD_HEIGHT = 16; // World height in chunk sections (16 blocks)
-	public static final int PALETTE_FREE = 1; // Additional space reserved in palette array by default
-	public static final int BIT_ARRAY_SIZE = 4096;
+	public static final int PALETTE_FREE = 10; // Additional space reserved in palette array by default
+	public static final int BIT_ARRAY_SIZE = 4096; // Data bit array size
+	public static final int BIOME_DATA = 256; // Byte array size
 	
 	/**
 	 * Gets protocol block id, which contains block id and meta.
@@ -54,6 +55,7 @@ public class ProtocolChunk {
 	private int chunkMask;
 	
 	public Section[] sections;
+	public byte[] biomes;
 	
 	public ProtocolChunk(byte[] buf, boolean hasSkylight, int chunkMask) {
 		this.buf = buf;
@@ -70,6 +72,13 @@ public class ProtocolChunk {
 				sections[i] = new Section().read(is);
 		}
 		
+		biomes = new byte[256];
+		try {
+			is.read(biomes);
+		} catch (IOException e) {
+			throw new ChunkReadException("Invalid biome data (IOException)!");
+		}
+		
 		return this;
 	}
 	
@@ -79,6 +88,12 @@ public class ProtocolChunk {
 		for (int i = 0; i < sections.length; i++) {
 			if ((chunkMask & 1 << i) > 0)
 				sections[i].write(os);
+		}
+		
+		try {
+			os.write(biomes);
+		} catch (IOException e) {
+			throw new ChunkReadException("Invalid biome data (IOException)!");
 		}
 		
 		return bos.toByteArray();
@@ -133,7 +148,8 @@ public class ProtocolChunk {
 
 				int paletteLength = mcSerializer.deserializeVarInt(is);
 				//System.out.println("palette:" + paletteLength);
-				palette = new int[paletteLength];
+				palette = new int[paletteLength + PALETTE_FREE];
+				paletteFree = PALETTE_FREE;
 				for (int i = 0; i < paletteLength; i++) {
 					palette[i] = mcSerializer.deserializeVarInt(is);
 				}
@@ -169,8 +185,9 @@ public class ProtocolChunk {
 			try {
 				os.writeByte(bitsPerBlock);
 				
-				mcSerializer.serializeVarInt(os, palette.length);
-				for (int i = 0; i < palette.length - paletteFree; i++) {
+				int paletteLength = palette.length - paletteFree;
+				mcSerializer.serializeVarInt(os, paletteLength);
+				for (int i = 0; i < paletteLength; i++) {
 					mcSerializer.serializeVarInt(os, palette[i]);
 				}
 				
@@ -189,7 +206,7 @@ public class ProtocolChunk {
 					}
 				}
 			} catch (IOException e) {
-				//throw new ChunkWriteException("Invalid chunk section (IOException)!");
+				throw new ChunkWriteException("Invalid chunk section (IOException)!");
 			}
 			
 			return this;
@@ -289,8 +306,10 @@ public class ProtocolChunk {
 		public void replaceAll(int from, int to) {
 			for (int i = 0; i < BIT_ARRAY_SIZE; i++) {
 				int block = getAt(i);
-				if (block == from)
+				if (block == from) {
 					setAt(i, to);
+					//System.out.println("setAt()");
+				}
 			}
 		}
 		
